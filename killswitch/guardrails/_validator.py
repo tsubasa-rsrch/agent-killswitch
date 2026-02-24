@@ -100,7 +100,14 @@ class ActionValidator:
                 return result
             self._action_timestamps.append(now)
 
-        # Block rules always win
+        # Audit mode: always allow, but log what would have been blocked
+        if self.mode == "audit":
+            for rule in self._block_rules:
+                if rule.matches(action):
+                    self._record_audit(action, rule, detail)
+            return ValidationResult(allowed=True, action=action)
+
+        # Block rules always win (for allowlist and blocklist modes)
         for rule in self._block_rules:
             if rule.matches(action):
                 result = ValidationResult(
@@ -127,23 +134,8 @@ class ActionValidator:
             self._record_violation(result, detail)
             return result
 
-        elif self.mode == "blocklist":
+        else:  # blocklist mode
             # Not blocked = allowed
-            return ValidationResult(allowed=True, action=action)
-
-        else:  # audit mode
-            # Always allow but log if it would have been blocked
-            for rule in self._block_rules:
-                if rule.matches(action):
-                    self._record_violation(
-                        ValidationResult(
-                            allowed=True,
-                            action=action,
-                            reason=f"Audit: would be blocked by {rule.pattern}",
-                            rule=rule.pattern,
-                        ),
-                        detail,
-                    )
             return ValidationResult(allowed=True, action=action)
 
     def _record_violation(self, result: ValidationResult, detail: str):
@@ -159,6 +151,18 @@ class ActionValidator:
 
         if self.on_violation:
             self.on_violation(violation)
+
+    def _record_audit(self, action: str, rule: ActionRule, detail: str):
+        """Record an audit finding (would-be violation in audit mode)."""
+        audit_entry = {
+            "time": time.time(),
+            "action": action,
+            "reason": f"Audit: would be blocked by {rule.pattern}",
+            "rule": rule.pattern,
+            "detail": detail,
+            "audit_only": True,
+        }
+        self._violations.append(audit_entry)
 
     @property
     def violations(self) -> List[Dict]:

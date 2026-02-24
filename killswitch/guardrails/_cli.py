@@ -30,12 +30,15 @@ def main():
         _install_hook()
         return
 
-    from killswitch.guardrails._scanner import scan_file, scan_directory, CRITICAL
+    from killswitch.guardrails._scanner import scan_file, scan_directory, CRITICAL, HIGH, MEDIUM, LOW
 
     severity = CRITICAL if args.pre_commit else args.severity
+    severity_order = {CRITICAL: 4, HIGH: 3, MEDIUM: 2, LOW: 1}
+    min_severity = severity_order.get(severity, 1)
 
     if os.path.isfile(args.path):
         findings = scan_file(args.path)
+        findings = [f for f in findings if severity_order.get(f.severity, 0) >= min_severity]
     else:
         findings = scan_directory(args.path, severity_threshold=severity)
 
