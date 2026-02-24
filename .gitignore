@@ -1,0 +1,23 @@
+__pycache__/
+*.pyc
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+
+# Dashboard
+dashboard/node_modules/
+dashboard/.svelte-kit/
+dashboard/build/
+
+# Config with secrets
+server/local.settings.json
+.env
+
+# OS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/

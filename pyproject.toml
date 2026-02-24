@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agent-killswitch"
+version = "0.1.0"
+description = "Emergency stop for AI agents. One line to add, one tap to kill."
+readme = "README.md"
+license = {text = "MIT"}
+authors = [{name = "Tsubasa Y"}]
+requires-python = ">=3.10"
+dependencies = []
+keywords = ["ai", "agents", "safety", "killswitch", "monitoring", "emergency-stop"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: System :: Monitoring",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0"]
+
+[project.urls]
+Homepage = "https://github.com/tsubasa-rsrch/agent-killswitch"
+Repository = "https://github.com/tsubasa-rsrch/agent-killswitch"
+
+[tool.setuptools.packages.find]
+include = ["killswitch*"]
