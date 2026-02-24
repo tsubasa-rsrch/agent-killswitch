@@ -1,9 +1,11 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import type { Agent, AgentAction } from '$lib/api';
-	import { fetchAgents, killAgent } from '$lib/api';
+	import { fetchAgents, killAgent, setApiKey } from '$lib/api';
 
 	let agents: Agent[] = $state([]);
+	let showSettings: boolean = $state(false);
+	let apiKeyInput: string = $state('');
 	let error: string = $state('');
 	let killing: string = $state('');
 	let confirmKill: string = $state('');
@@ -74,7 +76,15 @@
 	<header>
 		<h1>Agent Killswitch</h1>
 		<p class="subtitle">Emergency stop for AI agents</p>
+		<button class="settings-btn" onclick={() => showSettings = !showSettings}>&#9881;</button>
 	</header>
+
+	{#if showSettings}
+		<div class="settings-panel">
+			<input type="text" bind:value={apiKeyInput} placeholder="API Key" class="api-key-input" />
+			<button class="save-key-btn" onclick={() => { setApiKey(apiKeyInput); showSettings = false; loadAgents(); }}>Save</button>
+		</div>
+	{/if}
 
 	{#if error}
 		<div class="error-banner">{error}</div>
@@ -170,6 +180,46 @@
 	header {
 		text-align: center;
 		padding: 20px 0 16px;
+		position: relative;
+	}
+
+	.settings-btn {
+		position: absolute;
+		top: 20px;
+		right: 0;
+		background: none;
+		border: none;
+		color: #666;
+		font-size: 20px;
+		cursor: pointer;
+		padding: 4px 8px;
+	}
+
+	.settings-panel {
+		display: flex;
+		gap: 8px;
+		margin-bottom: 16px;
+	}
+
+	.api-key-input {
+		flex: 1;
+		padding: 10px 12px;
+		background: #1a1a1a;
+		border: 1px solid #333;
+		border-radius: 8px;
+		color: #fff;
+		font-family: 'JetBrains Mono', monospace;
+		font-size: 13px;
+	}
+
+	.save-key-btn {
+		padding: 10px 16px;
+		background: #22c55e;
+		border: none;
+		border-radius: 8px;
+		color: #000;
+		font-weight: 600;
+		cursor: pointer;
 	}
 
 	h1 {

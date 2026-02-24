@@ -25,6 +25,15 @@ export interface Agent {
 }
 
 function getApiKey(): string {
+	// Check URL params first (for easy sharing)
+	if (typeof window !== 'undefined') {
+		const params = new URLSearchParams(window.location.search);
+		const urlKey = params.get('key');
+		if (urlKey) {
+			localStorage.setItem('killswitch_api_key', urlKey);
+			return urlKey;
+		}
+	}
 	return localStorage.getItem('killswitch_api_key') || '';
 }
 
