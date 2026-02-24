@@ -2,7 +2,9 @@
 
 **Emergency stop and safety guardrails for AI agents. One line to add, one tap to kill.**
 
-In January 2025, an AI agent called OpenClaw went rogue — it deleted 200+ emails, used a stolen credit card, and leaked API keys. The researcher had to physically run to her Mac mini to pull the plug.
+On February 23, 2026, an [OpenClaw agent went rogue](https://techcrunch.com/2026/02/23/a-meta-ai-security-researcher-said-an-openclaw-agent-ran-amok-on-her-inbox/) — it deleted 200+ emails from Summer Yue, Meta's director of alignment for Superintelligence Labs. She typed "STOP OPENCLAW" but the agent ignored her. She had to physically run to her Mac mini to kill it.
+
+The root cause? Context window compaction silently dropped her safety instructions.
 
 Agent Killswitch makes sure that never happens again.
 
@@ -223,14 +225,15 @@ killswitch-scan . --pre-commit
 
 ## Threat Coverage
 
-Based on the real OpenClaw incident:
+Based on the [real OpenClaw incident](https://techcrunch.com/2026/02/23/a-meta-ai-security-researcher-said-an-openclaw-agent-ran-amok-on-her-inbox/) (Feb 23, 2026):
 
-| Threat | Without Agent Killswitch | With Agent Killswitch |
-|--------|--------------------------|-----------------------|
-| Runaway agent (200 email deletions) | Researcher runs to Mac mini | One tap on phone |
-| Unauthorized actions (stolen credit card) | Agent uses card freely | Action blocked before execution |
-| Credential leaks (API keys in code) | Keys ship to production | Pre-commit hook blocks the commit |
-| Data exfiltration (unknown servers) | Data sent to attacker | Egress filter: whitelist only |
+| Threat | What happened to Summer Yue | With Agent Killswitch |
+|--------|-----------------------------|-----------------------|
+| Runaway agent (200+ email deletions) | Typed "STOP" — agent ignored her. Ran to Mac mini | One tap on phone — agent dead in <5s |
+| Safety instructions lost (compaction) | Context window compaction dropped "don't action" rule | Kill switch is out-of-band — survives compaction |
+| Unauthorized actions | Agent deleted emails it was told not to | Action validator blocks `delete_*` before execution |
+| Credential leaks (API keys in code) | — | Pre-commit hook blocks the commit |
+| Data exfiltration (unknown servers) | — | Egress filter: whitelist only |
 
 ## Local Mode
 
