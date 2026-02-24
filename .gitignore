@@ -16,6 +16,13 @@ server/local.settings.json
 deploy/deployment-info.txt
 .env
 
+# Large video files (keep locally, too big for git)
+*.mov
+*.MOV
+
+# Asciinema casts (may contain credentials in command args)
+*.cast
+
 # OS
 .DS_Store
 
