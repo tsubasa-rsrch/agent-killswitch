@@ -159,6 +159,7 @@ class Killswitch:
 
 def monitor(
     name: str = "unnamed-agent",
+    agent_id: Optional[str] = None,
     server_url: Optional[str] = None,
     api_key: Optional[str] = None,
     on_kill: Optional[callable] = None,
@@ -172,6 +173,7 @@ def monitor(
     global _active_instance
     ks = Killswitch(
         name=name,
+        agent_id=agent_id,
         server_url=server_url,
         api_key=api_key,
         on_kill=on_kill,

@@ -60,6 +60,7 @@ def guard(
     # Start killswitch monitor
     ks = monitor(
         name=name,
+        agent_id=agent_id or None,
         server_url=server_url or None,
         api_key=api_key or None,
         on_kill=on_kill,
