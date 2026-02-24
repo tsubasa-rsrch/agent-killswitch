@@ -13,6 +13,7 @@ dashboard/build/
 
 # Config with secrets
 server/local.settings.json
+deploy/deployment-info.txt
 .env
 
 # OS
