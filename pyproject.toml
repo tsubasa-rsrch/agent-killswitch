@@ -4,14 +4,14 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "agent-killswitch"
-version = "0.1.0"
-description = "Emergency stop for AI agents. One line to add, one tap to kill."
+version = "0.2.0"
+description = "Emergency stop and safety guardrails for AI agents. One line to add, one tap to kill."
 readme = "README.md"
 license = {text = "MIT"}
 authors = [{name = "Tsubasa Y"}]
 requires-python = ">=3.10"
 dependencies = []
-keywords = ["ai", "agents", "safety", "killswitch", "monitoring", "emergency-stop"]
+keywords = ["ai", "agents", "safety", "killswitch", "guardrails", "monitoring", "emergency-stop", "credentials"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
@@ -23,7 +23,11 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
     "Topic :: System :: Monitoring",
+    "Topic :: Security",
 ]
+
+[project.scripts]
+killswitch-scan = "killswitch.guardrails._cli:main"
 
 [project.optional-dependencies]
 dev = ["pytest>=7.0"]

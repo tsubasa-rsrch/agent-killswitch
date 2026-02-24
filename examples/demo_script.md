@@ -1,61 +1,89 @@
 # Agent Killswitch - Demo Script (2 minutes)
 
 ## 0:00 - 0:15 | The Problem
-"In January 2025, an AI agent went rogue. It started deleting emails — over 200 of them. The researcher, Summer Yue from Meta AI Safety, couldn't stop it remotely. She had to physically run to her Mac mini and pull the plug. This is a real incident. And it's becoming more common as we deploy autonomous agents."
+"In January 2025, an AI agent called OpenClaw went rogue. It deleted 200 emails. It used stolen credit cards. It leaked API keys. And the researcher had to physically run to her Mac mini to stop it. This is real. And it's becoming more common."
 
-## 0:15 - 0:45 | The Solution (Live Demo)
-"Agent Killswitch. One line to add, one tap to kill."
+## 0:15 - 0:30 | The Solution
+"Agent Killswitch. One line to add. Three layers of defense."
 
-*Show terminal:*
-```bash
-pip install agent-killswitch
-```
-
-*Show code — highlight THE ONE LINE:*
+*Show code:*
 ```python
-from killswitch import monitor
-monitor(name="email-assistant")
+from killswitch import guard
+
+ks = guard(
+    name="email-assistant",
+    block=["delete_*", "send_email"],
+    allow_domains=["api.openai.com"],
+)
 ```
 
-"That's it. One import, one function call. Zero dependencies. Your agent is now monitored."
+"Kill switch, action validation, and egress filtering. Zero dependencies."
 
-*Run the rogue agent:*
+## 0:30 - 0:50 | Demo 1 — The Rogue Agent (unprotected)
+*Run rogue_agent.py:*
 ```bash
 python examples/rogue_agent.py
 ```
 
-"This simulates the exact scenario — an email assistant that starts deleting emails."
+"Without protection, the agent deletes emails one by one. You can only watch."
 
-## 0:45 - 1:15 | Phone Dashboard (Live)
-*Pull out phone, show PWA dashboard:*
+*Show phone dashboard — red DELETE entries scrolling in action log*
 
-"On my phone, I see the agent in real-time. Green dot — it's running. CPU and memory stats updating live. And here in the action log — I can see every email it's deleting, scrolling in real-time."
+## 0:50 - 1:10 | Demo 2 — Emergency Kill
+"But I have the dashboard on my phone."
 
-*Point to action log showing DELETE entries scrolling*
+*Tap EMERGENCY STOP on phone*
 
-"The researcher who had to run across her office? She could have been watching this from anywhere."
+"Dead. 5 seconds. From my phone."
 
-## 1:15 - 1:45 | The Kill (Live)
-"Now watch. The agent is deleting emails. I tap EMERGENCY STOP..."
+## 1:10 - 1:35 | Demo 3 — The Guarded Agent
+*Run guarded_agent.py:*
+```bash
+python examples/guarded_agent.py
+```
 
-*Tap the big red button, confirm*
+"Same agent, but with guardrails. Watch what happens."
 
-"...and it's dead. The agent receives the kill signal through its next heartbeat and self-terminates. SIGTERM first for graceful shutdown, SIGKILL escalation if needed."
+*Point to output:*
+- "Reads are allowed. DELETE — blocked. Every single one."
+- "It tries to exfiltrate data to ngrok, pastebin — blocked."
+- "Only the OpenAI API is whitelisted. Everything else is denied."
 
-*Show terminal — agent has stopped*
+"10 actions blocked. 3 egress attempts blocked. Zero emails deleted."
 
-"From rogue to stopped in under 5 seconds. From my phone."
+## 1:35 - 1:50 | Demo 4 — Pre-commit Scanner
+```bash
+killswitch-scan . --verbose
+```
 
-## 1:45 - 2:00 | Closing
-"Agent Killswitch. Setup takes 30 seconds. Killing takes 1 tap. Built on Azure Functions, Cosmos DB, and SignalR. Because the hardest part of building AI agents shouldn't be stopping them."
+"And for development — scan your codebase for hardcoded secrets before you even commit. API keys, passwords, RTSP URLs, connection strings. All caught."
+
+## 1:50 - 2:00 | Closing
+"Agent Killswitch. Kill switch plus guardrails plus credential scanning. Three layers of defense, zero dependencies. Built on Azure Functions, Cosmos DB, and deployed to your phone. Because the hardest part of AI agents shouldn't be making them safe."
 
 ---
 
 ## Technical Notes for Judges
 
 - **Zero dependencies**: SDK uses only Python stdlib
-- **Azure Integration**: Functions (compute) + Cosmos DB (state) + SignalR (real-time)
-- **PWA**: Works as native app on iOS/Android via "Add to Home Screen"
-- **Heartbeat architecture**: Agent polls server every 5s, kill signal delivered via response
-- **Kill escalation**: SIGTERM → 3s grace period → SIGKILL
-- **Local mode**: Works without server for development/testing
+- **Three defense layers**:
+  1. **Kill Switch**: Heartbeat monitoring + remote emergency stop
+  2. **Action Validator**: Allow/block list with regex patterns + rate limiting
+  3. **Egress Filter**: Domain whitelist/blacklist for outbound requests
+- **Credential Scanner**: Detects 11 secret patterns + 7 vulnerability patterns
+- **Azure Integration**: Functions (compute) + Cosmos DB (state) + Storage (dashboard)
+- **PWA Dashboard**: Real-time agent monitoring from any phone
+- **Pre-commit Hook**: `killswitch-scan --install-hook` adds git hook
+- **Heartbeat Architecture**: Agent polls server every 5s, kill signal via response
+- **Kill Escalation**: SIGTERM → 3s grace period → SIGKILL
+
+## Threat Coverage (OpenClaw Incident)
+
+| Threat | Defense |
+|--------|---------|
+| Runaway agent (200 email deletions) | Kill Switch — remote emergency stop |
+| Unauthorized actions (stolen credit card) | Action Validator — block dangerous operations |
+| Credential leaks (API keys in code) | Credential Scanner — pre-commit detection |
+| Data exfiltration (sending data to unknown servers) | Egress Filter — domain whitelist |
+| Prompt injection | *Future: Input Sanitizer* |
+| Memory poisoning | *Future: Memory Integrity Check* |
