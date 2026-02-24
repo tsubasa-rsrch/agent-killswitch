@@ -23,6 +23,9 @@ deploy/deployment-info.txt
 # Asciinema casts (may contain credentials in command args)
 *.cast
 
+# Intermediate GIF files
+*.gif
+
 # OS
 .DS_Store
 
