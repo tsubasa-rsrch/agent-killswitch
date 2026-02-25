@@ -13,12 +13,20 @@ Usage:
         block=["delete_*", "send_email"],
         allow_domains=["api.openai.com"],
     )
+
+    # With auto-kill on policy violations
+    ks = guard(
+        name="my-agent",
+        block=["delete_*", "send_email"],
+        auto_kill_threshold=100,  # Kill after 100 violation points
+    )
 """
 
 from killswitch._monitor import monitor, Killswitch
+from killswitch._policy import PolicyEngine
 
-__all__ = ["monitor", "Killswitch", "guard"]
-__version__ = "0.2.0"
+__all__ = ["monitor", "Killswitch", "guard", "PolicyEngine"]
+__version__ = "0.3.0"
 
 
 def guard(
@@ -31,12 +39,16 @@ def guard(
     allow_domains: list = None,
     block_domains: list = None,
     max_actions_per_minute: int = 0,
+    auto_kill_threshold: int = 100,
+    alert_threshold: int = 25,
     on_kill=None,
     on_violation=None,
+    on_alert=None,
 ):
     """Start monitoring with guardrails — the all-in-one safety setup.
 
-    Combines killswitch monitoring with action validation and egress filtering.
+    Combines killswitch monitoring with action validation, egress filtering,
+    and automatic policy enforcement (alert → pause → kill).
 
     Args:
         name: Human-readable agent name
@@ -48,14 +60,25 @@ def guard(
         allow_domains: List of domains the agent can contact
         block_domains: List of domains to block
         max_actions_per_minute: Rate limit (0 = unlimited)
+        auto_kill_threshold: Kill agent after this many violation points (0 = no auto-kill)
+        alert_threshold: Alert after this many violation points
         on_kill: Callback when kill signal received
         on_violation: Callback when a guardrail is violated
+        on_alert: Callback when alert threshold reached (receives violation, score, level)
 
     Returns:
-        Killswitch instance with .validator and .egress attached
+        Killswitch instance with .validator, .egress, and .policy attached
     """
     from killswitch.guardrails._validator import ActionValidator
     from killswitch.guardrails._egress import EgressFilter
+
+    # Create policy engine
+    policy = PolicyEngine(
+        kill_threshold=auto_kill_threshold,
+        alert_threshold=alert_threshold,
+        on_alert=on_alert,
+        auto_kill=auto_kill_threshold > 0,
+    )
 
     # Start killswitch monitor
     ks = monitor(
@@ -66,11 +89,26 @@ def guard(
         on_kill=on_kill,
     )
 
+    # Attach policy engine to killswitch (for auto-kill)
+    policy.attach(ks)
+    ks.policy = policy
+
+    # Create callbacks that chain: user callback + policy engine
+    def validator_violation_handler(v):
+        if on_violation:
+            on_violation(v)
+        policy.make_validator_callback()(v)
+
+    def egress_block_handler(v):
+        if on_violation:
+            on_violation(v)
+        policy.make_egress_callback()(v)
+
     # Set up action validator
     if allow:
         validator = ActionValidator(
             mode="allowlist",
-            on_violation=on_violation,
+            on_violation=validator_violation_handler,
             max_actions_per_minute=max_actions_per_minute,
         )
         for pattern in allow:
@@ -78,7 +116,7 @@ def guard(
     else:
         validator = ActionValidator(
             mode="blocklist",
-            on_violation=on_violation,
+            on_violation=validator_violation_handler,
             max_actions_per_minute=max_actions_per_minute,
         )
 
@@ -88,11 +126,11 @@ def guard(
 
     # Set up egress filter
     if allow_domains:
-        egress = EgressFilter(mode="whitelist")
+        egress = EgressFilter(mode="whitelist", on_block=egress_block_handler)
         for domain in allow_domains:
             egress.allow_domain(domain)
     else:
-        egress = EgressFilter(mode="monitor")
+        egress = EgressFilter(mode="monitor", on_block=egress_block_handler)
 
     if block_domains:
         for domain in block_domains:

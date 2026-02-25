@@ -48,6 +48,11 @@ class Killswitch:
         self._status = "starting"
         self._heartbeat_count = 0
 
+        # Guardrails (attached by guard())
+        self.validator = None
+        self.egress = None
+        self.policy = None
+
         config = load_config()
         self.server_url = server_url or config.get("server_url", "")
         self.api_key = api_key or config.get("api_key", "")
@@ -103,6 +108,11 @@ class Killswitch:
             "metrics": metrics,
             "recent_actions": self.actions.recent(5),
         }
+
+        # Include policy violations if policy engine is attached
+        if self.policy:
+            payload["policy"] = self.policy.summary
+            payload["recent_violations"] = self.policy.recent_violations(5)
 
         if self.local_mode:
             self._handle_local_heartbeat(payload)
