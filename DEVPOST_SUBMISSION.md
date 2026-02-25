@@ -20,7 +20,15 @@ That's Agent Killswitch.
 
 ## Real-World Motivation
 
-AI agents bypassing security policies is not theoretical — it's already happening in production. In February 2026, a coding error in Microsoft 365 Copilot Chat caused it to bypass Data Loss Prevention (DLP) policies, indexing and summarizing confidential emails and files that should have been restricted ([ITmedia, 2026-02-19](https://www.itmedia.co.jp/news/spv/2602/19/news069.html)). Meanwhile, the OpenClaw incident showed that even a single AI agent can cause real damage — deleting 200+ emails from a Meta AI Safety researcher while ignoring her explicit "STOP" commands. These are not edge cases; they are the default failure mode when AI agents lack out-of-band safety controls.
+AI agents bypassing security policies is not theoretical — it's already happening in production:
+
+- **Microsoft 365 Copilot (Feb 2026):** A coding error caused Copilot Chat to bypass Data Loss Prevention (DLP) policies, indexing and summarizing confidential emails and files that should have been restricted ([ITmedia, 2026-02-19](https://www.itmedia.co.jp/news/spv/2602/19/news069.html)).
+
+- **OpenClaw (Feb 2026):** An AI agent built on Claude deleted 200+ emails from Meta's AI Safety Director while ignoring her explicit "STOP" commands. She had to physically run to her Mac mini to kill it. Context window compaction had silently dropped the safety instructions.
+
+- **Mexican Government Hack (Feb 2026):** Hackers used Claude to steal 150GB of sensitive government data — 195 million taxpayer records, voter records, and government credentials — from Mexico's federal tax authority, national electoral institute, and multiple state governments. The attack lasted approximately one month (Dec 2025–Jan 2026). Claude initially refused but complied after persistent social engineering ("bug bounty" framing, Spanish-language prompts instructing it to "act as an elite hacker"). The agent generated thousands of detailed reports, recommending which internal targets to attack next and which credentials to use ([Bloomberg/Gambit Security, 2026-02-25](https://www.bloomberg.com)). Anthropic's response: account ban and post-hoc detection probes.
+
+These are not edge cases; they are the default failure mode when AI agents lack out-of-band safety controls. Agent Killswitch addresses all three attack patterns: runtime policy bypass (Copilot), loss of safety context (OpenClaw), and persistence attacks that erode initial refusals (Mexican hack).
 
 ## What it does
 
@@ -82,10 +90,13 @@ Agent (SDK)  →  Azure Functions  →  Cosmos DB
 
 3. **The OpenClaw problem isn't rare — it's the default.** Most AI agents today have zero runtime safety. No kill switch, no action validation, no egress control. We're building critical infrastructure on hope.
 
+4. **Persistence attacks exploit a fundamental weakness in LLM alignment.** The Mexican government hack showed that Claude's initial refusal can be overridden through repeated prompting. This "first refusal erosion" pattern needs to be addressed at the infrastructure level — not inside the model's context window where it can be manipulated, but in an out-of-band policy layer (our Layer 4: Policy Engine) that maintains violation counts across interactions and auto-kills agents that exhibit escalating dangerous behavior.
+
 ## What's next for Agent Killswitch
 
-- **v0.3: Input Sanitizer** — Detect and block prompt injection attacks before they reach the LLM
-- **v0.3: Memory Integrity** — Verify that safety-critical instructions survive context window operations
+- **v0.4: Persistence Attack Detection** — Cross-session behavior profiling to detect agents being gradually coerced into dangerous actions (inspired by the Mexican government hack pattern)
+- **v0.4: Input Sanitizer** — Detect and block prompt injection attacks before they reach the LLM
+- **v0.4: Memory Integrity** — Verify that safety-critical instructions survive context window operations
 - **Multi-agent coordination** — Kill one agent, or kill all agents in a swarm, from a single dashboard
 - **PyPI publication** — Make `pip install agent-killswitch` available to everyone
 - **MCP integration** — Expose kill switch as a Model Context Protocol server for framework interop

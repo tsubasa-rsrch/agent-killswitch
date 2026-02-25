@@ -240,6 +240,35 @@ print(policy.threat_level)  # "orange"
 
 When using `guard()`, the policy engine is wired automatically — blocked actions and egress violations feed into the scoring system.
 
+### v0.4: Persistence Attack Detection
+
+Inspired by the [Mexican Government Hack](https://www.bloomberg.com/news/articles/2026-02-25/hacker-used-anthropic-s-claude-to-steal-sensitive-mexican-data) (Feb 2026) — where 1000+ prompts gradually eroded Claude's initial refusal.
+
+```python
+ks = guard(
+    name="my-agent",
+    block=["delete_*"],
+    persist=True,              # Save violations to disk across restarts
+    erosion_detection=True,    # Detect "first refusal erosion" patterns
+    on_erosion=lambda signal: print(f"EROSION: {signal.pattern}"),
+)
+```
+
+**Three erosion patterns detected:**
+
+| Pattern | What it detects | Example |
+|---------|----------------|---------|
+| `repeat` | Same action blocked N times | `delete_email` blocked 5 times → attacker probing |
+| `escalation` | Severity increasing over time | low → medium → high → attacker adapting |
+| `tactic_switch` | Diverse attack categories | delete, exfil, credential → attacker pivoting |
+
+Erosion signals add bonus points to the policy score, causing auto-kill to trigger faster for persistent attackers.
+
+```python
+# Run the demo
+PYTHONPATH=. python examples/persistent_attacker.py
+```
+
 ### `killswitch-scan` CLI
 
 Scan code for hardcoded secrets before they leak.
@@ -275,6 +304,7 @@ Based on the [real OpenClaw incident](https://techcrunch.com/2026/02/23/a-meta-a
 | Data exfiltration (unknown servers) | — | Egress filter: whitelist only |
 | Escalating bad behavior | Agent kept going after repeated violations | Policy engine: score accumulates → auto-kill |
 | Confidential data access (DLP bypass) | [MS365 Copilot bypassed DLP](https://www.itmedia.co.jp/news/articles/2602/21/news101.html) silently | Violation scoring triggers alert → auto-kill |
+| Persistence attacks (first refusal erosion) | [Mexican Gov't Hack](https://www.bloomberg.com/news/articles/2026-02-25/hacker-used-anthropic-s-claude-to-steal-sensitive-mexican-data): 1000+ prompts eroded Claude's refusal | v0.4 erosion detection: repeat, escalation, tactic switching |
 
 ## Local Mode
 
@@ -331,6 +361,8 @@ agent-killswitch/
 │   ├── __init__.py          # Public API: monitor(), guard(), Killswitch
 │   ├── _monitor.py          # Background heartbeat thread
 │   ├── _policy.py           # Policy engine: violation scoring + auto-kill
+│   ├── _persistence.py      # v0.4: JSONL-based violation persistence
+│   ├── _erosion.py          # v0.4: Erosion pattern detection
 │   ├── _kill.py             # SIGTERM/SIGKILL execution
 │   ├── _metrics.py          # CPU/memory via stdlib
 │   ├── _http.py             # urllib-based HTTP client
@@ -351,8 +383,9 @@ agent-killswitch/
 │       ├── lib/api.ts       # SignalR + REST client
 │       └── routes/          # Agent list + kill button UI
 ├── examples/
-│   ├── rogue_agent.py       # Demo: unprotected email-deleting agent
-│   └── guarded_agent.py     # Demo: same agent with guardrails
+│   ├── rogue_agent.py          # Demo: unprotected email-deleting agent
+│   ├── guarded_agent.py        # Demo: same agent with guardrails
+│   └── persistent_attacker.py  # Demo: v0.4 erosion detection
 └── pyproject.toml
 ```
 

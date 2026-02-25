@@ -24,9 +24,10 @@ Usage:
 
 from killswitch._monitor import monitor, Killswitch
 from killswitch._policy import PolicyEngine
+from killswitch._erosion import ErosionDetector
 
-__all__ = ["monitor", "Killswitch", "guard", "PolicyEngine"]
-__version__ = "0.3.0"
+__all__ = ["monitor", "Killswitch", "guard", "PolicyEngine", "ErosionDetector"]
+__version__ = "0.4.0"
 
 
 def guard(
@@ -44,6 +45,9 @@ def guard(
     on_kill=None,
     on_violation=None,
     on_alert=None,
+    on_erosion=None,
+    persist: bool = False,
+    erosion_detection: bool = False,
 ):
     """Start monitoring with guardrails — the all-in-one safety setup.
 
@@ -65,6 +69,9 @@ def guard(
         on_kill: Callback when kill signal received
         on_violation: Callback when a guardrail is violated
         on_alert: Callback when alert threshold reached (receives violation, score, level)
+        on_erosion: Callback when erosion pattern detected (receives ErosionSignal)
+        persist: Save violations to disk across agent restarts (v0.4)
+        erosion_detection: Detect "first refusal erosion" patterns (v0.4)
 
     Returns:
         Killswitch instance with .validator, .egress, and .policy attached
@@ -72,12 +79,16 @@ def guard(
     from killswitch.guardrails._validator import ActionValidator
     from killswitch.guardrails._egress import EgressFilter
 
-    # Create policy engine
+    # Create policy engine (v0.4: with persistence + erosion)
     policy = PolicyEngine(
         kill_threshold=auto_kill_threshold,
         alert_threshold=alert_threshold,
         on_alert=on_alert,
+        on_erosion=on_erosion,
         auto_kill=auto_kill_threshold > 0,
+        persist=persist,
+        agent_name=name,
+        erosion_detection=erosion_detection,
     )
 
     # Start killswitch monitor
