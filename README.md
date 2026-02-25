@@ -10,10 +10,15 @@ Agent Killswitch makes sure that never happens again.
 
 ```python
 from killswitch import guard
-guard(name="my-agent", block=["delete_*"], allow_domains=["api.openai.com"])
+ks = guard(
+    name="my-agent",
+    block=["delete_*"],
+    allow_domains=["api.openai.com"],
+    auto_kill_threshold=100,  # Auto-kill after 100 violation points
+)
 ```
 
-Three lines. Three layers of defense. Zero dependencies.
+Four lines. Four layers of defense. Zero dependencies.
 
 ## Install
 
@@ -65,13 +70,14 @@ Data exfiltrated            3 egress blocks
 Had to manually kill        Auto-prevented
 ```
 
-## Three Defense Layers
+## Four Defense Layers
 
 | Layer | What | How |
 |-------|------|-----|
 | **Kill Switch** | Emergency stop from phone | Heartbeat polling + SIGTERM/SIGKILL |
 | **Action Validator** | Block dangerous operations | Regex allow/block lists + rate limiting |
 | **Egress Filter** | Block data exfiltration | Domain whitelist + known-bad blacklist |
+| **Policy Engine** | Auto-kill on escalation | Violation scoring + threat levels + auto-kill |
 
 Plus a **Credential Scanner** CLI that catches hardcoded secrets before they ship to production.
 
@@ -81,19 +87,22 @@ Plus a **Credential Scanner** CLI that catches hardcoded secrets before they shi
 ┌─────────────┐     heartbeat     ┌──────────────┐     realtime     ┌─────────────┐
 │  Your Agent  │ ──── every 5s ──→│ Azure Server │ ──── SignalR ──→│  Phone PWA  │
 │  + guard()   │ ←── kill signal ─│  (Functions) │ ←── kill tap ───│  Dashboard  │
-└──────┬──────┘                   └──────────────┘                  └─────────────┘
-       │
-  ┌────┴────┐
-  │ guard() │
-  ├─────────┤
-  │ Kill    │ ← Heartbeat + remote kill signal
-  │ Switch  │
+└──────┬──────┘                   └──────┬───────┘                  └─────────────┘
+       │                                 │
+  ┌────┴────┐                    ┌───────┴───────┐
+  │ guard() │                    │  Server-side   │
+  ├─────────┤                    │  Policy Check  │
+  │ Kill    │ ← Remote signal    │  (dual enforce)│
+  │ Switch  │                    └────────────────┘
   ├─────────┤
   │ Action  │ ← .validator.check("action") before execution
-  │ Validator│
+  │ Validator│     │ violations feed into ↓
   ├─────────┤
   │ Egress  │ ← .egress.check(url) before HTTP requests
-  │ Filter  │
+  │ Filter  │     │ violations feed into ↓
+  ├─────────┤
+  │ Policy  │ ← Score accumulation → alert → AUTO-KILL
+  │ Engine  │   GREEN → YELLOW → ORANGE → RED
   └─────────┘
 ```
 
@@ -110,9 +119,9 @@ ks = monitor(name="my-agent")
 ks.log("processing", detail="2,847 records")
 ```
 
-### `guard(name, block, allow, allow_domains, block_domains, max_actions_per_minute, on_kill, on_violation)`
+### `guard(name, block, allow, allow_domains, block_domains, max_actions_per_minute, auto_kill_threshold, alert_threshold, on_kill, on_violation, on_alert)`
 
-Start monitoring with all three layers of defense.
+Start monitoring with all four layers of defense.
 
 ```python
 from killswitch import guard
@@ -123,12 +132,15 @@ ks = guard(
     allow_domains=["api.openai.com"],               # Whitelist domains
     block_domains=["*.ngrok-free.app"],              # Block domains
     max_actions_per_minute=30,                       # Rate limit
+    auto_kill_threshold=100,                         # Auto-kill at 100 violation pts
+    alert_threshold=25,                              # Alert at 25 pts
     on_kill=lambda reason: cleanup(),                # Kill callback
     on_violation=lambda v: log(v["reason"]),          # Violation callback
+    on_alert=lambda v, score, level: notify(level),   # Alert callback
 )
 ```
 
-**Returns** a `Killswitch` instance with `.validator` and `.egress` attached.
+**Returns** a `Killswitch` instance with `.validator`, `.egress`, and `.policy` attached.
 
 ### `ActionValidator`
 
@@ -201,6 +213,33 @@ egress = ai_provider_filter()
 egress = known_bad_domains()
 ```
 
+### `PolicyEngine`
+
+Automatic threat escalation: detect → alert → kill.
+
+```python
+from killswitch import PolicyEngine
+
+policy = PolicyEngine(
+    kill_threshold=100,    # Auto-kill at 100 points
+    alert_threshold=25,    # Alert at 25 points
+    window_seconds=300,    # 5-minute sliding window
+    on_alert=lambda v, score, level: print(f"ALERT: {level}"),
+)
+
+# Severity levels and default point values:
+#   critical = 100  (instant kill — e.g., credential exfiltration)
+#   high     = 25   (dangerous — e.g., mass deletion attempt)
+#   medium   = 5    (suspicious — e.g., blocked action)
+#   low      = 1    (minor — e.g., rate limit hit)
+
+policy.report("high", "delete_email", "Mass deletion", detail="200 emails")
+print(policy.score)         # 25 (within sliding window)
+print(policy.threat_level)  # "orange"
+```
+
+When using `guard()`, the policy engine is wired automatically — blocked actions and egress violations feed into the scoring system.
+
 ### `killswitch-scan` CLI
 
 Scan code for hardcoded secrets before they leak.
@@ -234,6 +273,8 @@ Based on the [real OpenClaw incident](https://techcrunch.com/2026/02/23/a-meta-a
 | Unauthorized actions | Agent deleted emails it was told not to | Action validator blocks `delete_*` before execution |
 | Credential leaks (API keys in code) | — | Pre-commit hook blocks the commit |
 | Data exfiltration (unknown servers) | — | Egress filter: whitelist only |
+| Escalating bad behavior | Agent kept going after repeated violations | Policy engine: score accumulates → auto-kill |
+| Confidential data access (DLP bypass) | [MS365 Copilot bypassed DLP](https://www.itmedia.co.jp/news/articles/2602/21/news101.html) silently | Violation scoring triggers alert → auto-kill |
 
 ## Local Mode
 
@@ -289,6 +330,7 @@ agent-killswitch/
 ├── killswitch/              # Python SDK (zero dependencies)
 │   ├── __init__.py          # Public API: monitor(), guard(), Killswitch
 │   ├── _monitor.py          # Background heartbeat thread
+│   ├── _policy.py           # Policy engine: violation scoring + auto-kill
 │   ├── _kill.py             # SIGTERM/SIGKILL execution
 │   ├── _metrics.py          # CPU/memory via stdlib
 │   ├── _http.py             # urllib-based HTTP client
