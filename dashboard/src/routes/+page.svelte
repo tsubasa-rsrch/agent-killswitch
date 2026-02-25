@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import type { Agent, AgentAction } from '$lib/api';
+	import type { Agent, AgentAction, Violation } from '$lib/api';
 	import { fetchAgents, killAgent, setApiKey } from '$lib/api';
 
 	let agents: Agent[] = $state([]);
@@ -58,6 +58,26 @@
 		}
 	}
 
+	function threatColor(level: string): string {
+		switch (level) {
+			case 'green': return '#22c55e';
+			case 'yellow': return '#eab308';
+			case 'orange': return '#f97316';
+			case 'red': return '#ef4444';
+			default: return '#6b7280';
+		}
+	}
+
+	function severityColor(severity: string): string {
+		switch (severity) {
+			case 'critical': return '#ef4444';
+			case 'high': return '#f97316';
+			case 'medium': return '#eab308';
+			case 'low': return '#6b7280';
+			default: return '#6b7280';
+		}
+	}
+
 	function timeAgo(iso: string): string {
 		const diff = (now - new Date(iso).getTime()) / 1000;
 		if (diff < 5) return 'just now';
@@ -69,6 +89,15 @@
 	function formatAction(a: AgentAction): string {
 		const time = new Date(a.t * 1000).toLocaleTimeString();
 		return `${time} ${a.action}${a.detail ? ': ' + a.detail : ''}`;
+	}
+
+	function formatViolation(v: Violation): string {
+		const time = new Date(v.t * 1000).toLocaleTimeString();
+		return `${time} ${v.action}`;
+	}
+
+	function hasPolicy(agent: Agent): boolean {
+		return agent.policy && agent.policy.threat_level !== undefined;
 	}
 </script>
 
@@ -112,6 +141,28 @@
 					</span>
 				</div>
 
+				{#if hasPolicy(agent)}
+					<div class="threat-bar">
+						<div class="threat-header">
+							<span class="threat-label">THREAT</span>
+							<span class="threat-level" style="color: {threatColor(agent.policy.threat_level)}">
+								{agent.policy.threat_level.toUpperCase()}
+							</span>
+						</div>
+						<div class="threat-track">
+							<div
+								class="threat-fill"
+								style="width: {Math.min((agent.policy.score / agent.policy.kill_threshold) * 100, 100)}%; background: {threatColor(agent.policy.threat_level)}"
+							></div>
+							<div class="threat-kill-line" style="left: 100%"></div>
+						</div>
+						<div class="threat-meta">
+							<span>{agent.policy.score} / {agent.policy.kill_threshold} pts</span>
+							<span>{agent.policy.violations_in_window} violations</span>
+						</div>
+					</div>
+				{/if}
+
 				<div class="metrics">
 					<div class="metric">
 						<span class="metric-label">CPU</span>
@@ -134,6 +185,21 @@
 					<span>Last heartbeat: {agent.last_heartbeat ? timeAgo(agent.last_heartbeat) : 'never'}</span>
 				</div>
 
+				{#if agent.recent_violations && agent.recent_violations.length > 0}
+					<div class="violations-log">
+						<div class="violations-header">Recent Violations</div>
+						{#each agent.recent_violations as v}
+							<div class="violation-entry">
+								<span class="violation-severity" style="color: {severityColor(v.severity)}">
+									{v.severity.toUpperCase()}
+								</span>
+								<span class="violation-text">{formatViolation(v)}</span>
+								<span class="violation-pts">+{v.points}</span>
+							</div>
+						{/each}
+					</div>
+				{/if}
+
 				{#if agent.recent_actions.length > 0}
 					<div class="action-log">
 						<div class="action-log-header">Recent Actions</div>
@@ -143,6 +209,10 @@
 							</div>
 						{/each}
 					</div>
+				{/if}
+
+				{#if agent.kill_reason}
+					<div class="kill-reason">Kill reason: {agent.kill_reason}</div>
 				{/if}
 
 				{#if agent.status !== 'killed' && agent.status !== 'offline'}
@@ -331,6 +401,123 @@
 		font-size: 11px;
 		font-weight: 600;
 		letter-spacing: 0.05em;
+	}
+
+	/* Threat level indicator */
+	.threat-bar {
+		background: #0d0d0d;
+		border: 1px solid #1f1f1f;
+		border-radius: 8px;
+		padding: 10px;
+		margin-bottom: 10px;
+	}
+
+	.threat-header {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		margin-bottom: 6px;
+	}
+
+	.threat-label {
+		font-size: 10px;
+		font-weight: 600;
+		color: #666;
+		letter-spacing: 0.1em;
+	}
+
+	.threat-level {
+		font-size: 12px;
+		font-weight: 700;
+		letter-spacing: 0.05em;
+	}
+
+	.threat-track {
+		position: relative;
+		height: 8px;
+		background: #1a1a1a;
+		border-radius: 4px;
+		overflow: hidden;
+		margin-bottom: 6px;
+	}
+
+	.threat-fill {
+		height: 100%;
+		border-radius: 4px;
+		transition: width 0.5s ease, background 0.3s ease;
+	}
+
+	.threat-meta {
+		display: flex;
+		justify-content: space-between;
+		font-family: 'JetBrains Mono', monospace;
+		font-size: 10px;
+		color: #555;
+	}
+
+	/* Violations */
+	.violations-log {
+		background: #0d0808;
+		border: 1px solid #2d1515;
+		border-radius: 8px;
+		padding: 8px;
+		margin-bottom: 10px;
+		max-height: 120px;
+		overflow-y: auto;
+	}
+
+	.violations-header {
+		font-size: 11px;
+		font-weight: 600;
+		color: #ef4444;
+		margin-bottom: 4px;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+	}
+
+	.violation-entry {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		font-family: 'JetBrains Mono', monospace;
+		font-size: 10px;
+		color: #aaa;
+		padding: 3px 0;
+		border-bottom: 1px solid #1a0e0e;
+	}
+
+	.violation-entry:last-child {
+		border-bottom: none;
+	}
+
+	.violation-severity {
+		font-weight: 700;
+		font-size: 9px;
+		flex-shrink: 0;
+		min-width: 52px;
+	}
+
+	.violation-text {
+		flex: 1;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.violation-pts {
+		color: #ef4444;
+		font-weight: 600;
+		flex-shrink: 0;
+	}
+
+	.kill-reason {
+		font-family: 'JetBrains Mono', monospace;
+		font-size: 11px;
+		color: #f97316;
+		padding: 6px 8px;
+		background: #1a1008;
+		border-radius: 6px;
+		margin-bottom: 10px;
 	}
 
 	.metrics {

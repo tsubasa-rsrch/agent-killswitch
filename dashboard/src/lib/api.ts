@@ -14,14 +14,36 @@ export interface AgentAction {
 	detail?: string;
 }
 
+export interface PolicySummary {
+	score: number;
+	total_score: number;
+	threat_level: 'green' | 'yellow' | 'orange' | 'red';
+	kill_threshold: number;
+	violations_in_window: number;
+	total_violations: number;
+	auto_kill: boolean;
+}
+
+export interface Violation {
+	severity: string;
+	action: string;
+	reason: string;
+	detail: string;
+	points: number;
+	t: number;
+}
+
 export interface Agent {
 	agent_id: string;
 	name: string;
 	status: 'running' | 'stale' | 'offline' | 'killed' | 'starting';
 	metrics: AgentMetrics;
 	recent_actions: AgentAction[];
+	policy: PolicySummary;
+	recent_violations: Violation[];
 	last_heartbeat: string;
 	kill_requested: boolean;
+	kill_reason: string;
 }
 
 function getApiKey(): string {
